@@ -21,8 +21,6 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class UpdateCertificatesCommand extends Command
 {
-    const CERTS_BASE_PATH = '/etc/letsencrypt/live';
-
     /**
      * Set the arguments and options required for the command line tool.
      *
@@ -97,12 +95,12 @@ class UpdateCertificatesCommand extends Command
 
             $basePath = sprintf('%s/%s', self::CERTS_BASE_PATH, $domain);
             $payload  = [
-                'headers' => [
+                'headers'     => [
                     'accept' => 'application/json',
                 ],
                 'form_params' => [
-                    'cert' => file_get_contents(sprintf('%s/fullchain.pem', $basePath)),
-                    'key'  => file_get_contents(sprintf('%s/privkey.pem', $basePath)),
+                    'cert'   => file_get_contents(sprintf('%s/fullchain.pem', $basePath)),
+                    'key'    => file_get_contents(sprintf('%s/privkey.pem', $basePath)),
                     'snis[]' => $domain,
                 ],
             ];
