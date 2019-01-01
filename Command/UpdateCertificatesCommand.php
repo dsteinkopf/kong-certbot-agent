@@ -92,17 +92,26 @@ class UpdateCertificatesCommand extends Command
         // Update kong admin with the new certificates foreach domain
         $guzzle = new \GuzzleHttp\Client();
 
+        $domainsSuccessfullySent = 0;
         foreach ($domains as $domain) {
+            $basePath = sprintf('%s/%s', self::CERTS_BASE_PATH, $domain);
+            $fullchainPath = sprintf('%s/fullchain.pem', $basePath);
+            $privkeyPath = sprintf('%s/privkey.pem', $basePath);
+
+            $ago = time() - filemtime($fullchainPath);
+            if ($ago > 86400) {
+                $output->writeln(sprintf('Certificates config for %s is unchanged.', $domain));
+                continue;
+            }
             $output->writeln(sprintf('Updating certificates config for %s', $domain));
 
-            $basePath = sprintf('%s/%s', self::CERTS_BASE_PATH, $domain);
             $payload  = [
                 'headers' => [
                     'accept' => 'application/json',
                 ],
                 'form_params' => [
-                    'cert' => file_get_contents(sprintf('%s/fullchain.pem', $basePath)),
-                    'key'  => file_get_contents(sprintf('%s/privkey.pem', $basePath)),
+                    'cert' => file_get_contents($fullchainPath),
+                    'key'  => file_get_contents($privkeyPath),
                     'snis[]' => $domain,
                 ],
             ];
@@ -110,6 +119,7 @@ class UpdateCertificatesCommand extends Command
             // Unfortunately for us, PUT is not UPSERT
             try {
                 $guzzle->post(sprintf('%s/certificates', $kongAdminUri), $payload);
+                $domainsSuccessfullySent++;
             } catch (ClientException $ex) {
                 if ($ex->getCode() !== 409 && $ex->getCode() !== 400) {
                     throw $ex;
@@ -121,12 +131,13 @@ class UpdateCertificatesCommand extends Command
 
                 unset($payload['form_params']['snis']);
                 $guzzle->patch(sprintf('%s/certificates/%s', $kongAdminUri, $domain), $payload);
+                $domainsSuccessfullySent++;
             }
 
             $output->writeln(sprintf('Certificate for domain %s correctly sent to Kong', $domain));
         }
 
-        $output->writeln(sprintf('%s certificates correctly sent to Kong', count($domains)));
+        $output->writeln(sprintf('%s certificate(s) correctly sent to Kong', $domainsSuccessfullySent));
 
         return 0;
     }
